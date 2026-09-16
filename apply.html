@@ -1,0 +1,56 @@
+<!doctype html>
+<!--
+  CYNEX Agent Studio 사용자키 신청 페이지 (정적 · 외부 스크립트 없음).
+  Supabase 는 자기 도메인(*.supabase.co)에서 나가는 HTML 을 text/plain + CSP sandbox 로 바꿔 버린다 — Storage 도,
+  Edge Function 응답도 같다(2026-09-16 실측: Content-Type: text/plain · Content-Security-Policy: default-src 'none'; sandbox).
+  그래서 이 페이지는 다른 곳(GitHub Pages 또는 cynex.co.kr)에서 서빙하고, 신청(POST)만 Edge Function 으로 보낸다.
+  함수 주소(API_URL)는 공개값이다. 함수의 GET 은 이 페이지로 302 리다이렉트한다.
+-->
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex"><title>CYNEX Agent Studio 사용자키 신청</title>
+<style>
+:root{--bg:#f4f5f7;--card:#fff;--line:#e5e7eb;--fg:#1f2328;--dim:#6b7280;--accent:#2f81f7;--ok:#1a7f37;--bad:#cf222e;--warn:#9a6700}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.6 'Malgun Gothic','Apple SD Gothic Neo','Segoe UI',sans-serif}
+.wrap{max-width:520px;margin:32px auto;padding:0 14px}.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px 28px}
+h1{font-size:20px;margin:0 0 6px}.sub{color:var(--dim);font-size:13px}label{display:block;font-size:12.5px;color:var(--dim);margin:14px 0 4px}
+input{width:100%;font:inherit;padding:10px 12px;border:1px solid #cfd4dc;border-radius:8px;background:#fff}input:focus{outline:2px solid var(--accent);border-color:var(--accent)}
+button{margin-top:18px;width:100%;font:inherit;font-weight:700;padding:12px;border:0;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+button:disabled{opacity:.55;cursor:default}.msg{margin-top:14px;padding:12px 14px;border-radius:8px;font-size:14px;display:none;white-space:pre-wrap}
+.msg.ok{display:block;background:#eaf7ee;color:var(--ok);border:1px solid #b7e2c2}.msg.bad{display:block;background:#fdecee;color:var(--bad);border:1px solid #f3b8be}
+.note{margin-top:18px;font-size:12.5px;color:var(--dim);line-height:1.6}.foot{margin-top:14px;text-align:center;font-size:12px;color:var(--dim)}
+</style></head><body><div class="wrap"><div class="card">
+<div class="sub" style="letter-spacing:.08em">CYNEX AGENT STUDIO</div>
+<h1>사용자키 신청</h1>
+<div class="sub">구매하신 제품시리얼을 입력하시면 사용자키를 이메일로 보내 드립니다.</div>
+<form id="f" autocomplete="on">
+<label for="name">이름</label><input id="name" name="name" maxlength="40" required autocomplete="name">
+<label for="email">구글 이메일 주소 (사용자키를 받을 주소)</label><input id="email" name="email" type="email" maxlength="254" required autocomplete="email" placeholder="example@gmail.com">
+<label for="email2">이메일 주소 확인 (한 번 더)</label><input id="email2" name="email2" type="email" maxlength="254" required autocomplete="off">
+<label for="serial">제품시리얼</label><input id="serial" name="serial" maxlength="60" required autocomplete="off" placeholder="예: BX6CQ-D58V4-Z72HN-685Q3-95411" style="font-family:Consolas,'Courier New',monospace">
+<button id="go" type="submit">사용자키 신청</button>
+</form>
+<div id="msg" class="msg"></div>
+<div class="note">· 제품시리얼 하나로 <b>한 번만</b> 신청할 수 있습니다.<br>· 사용자키는 입력하신 이메일로만 보내 드리며, 앱에서 그 구글 계정으로 로그인해 등록합니다.<br>· 메일이 오지 않으면 스팸함을 확인해 주세요. 문의: jinuman@cynex.co.kr</div>
+</div><div class="foot">© 2026 CYNEX. All rights reserved.</div></div>
+<script>
+(function(){
+  var API_URL='https://zlxdsrbnmumbmztjopaz.supabase.co/functions/v1/apply';
+  var f=document.getElementById('f'),go=document.getElementById('go'),msg=document.getElementById('msg');
+  function show(ok,t){msg.className='msg '+(ok?'ok':'bad');msg.textContent=t;}
+  f.addEventListener('submit',async function(e){
+    e.preventDefault();
+    var name=f.name.value.trim(),email=f.email.value.trim().toLowerCase(),email2=f.email2.value.trim().toLowerCase(),serial=f.serial.value.trim();
+    if(!name){show(false,'이름을 입력해 주세요.');return;}
+    if(email!==email2){show(false,'이메일 주소 두 칸이 서로 다릅니다. 다시 확인해 주세요.');return;}
+    if(!serial){show(false,'제품시리얼을 입력해 주세요.');return;}
+    go.disabled=true;go.textContent='확인하는 중…';msg.className='msg';
+    try{
+      var r=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:name,email:email,serial:serial})});
+      var j=await r.json().catch(function(){return {ok:false,message:'응답을 읽지 못했습니다. 잠시 후 다시 시도해 주세요.'};});
+      show(!!j.ok,j.message||(j.ok?'보냈습니다.':'실패했습니다.'));
+      if(j.ok){f.serial.value='';}
+    }catch(err){show(false,'서버에 연결하지 못했습니다. 잠시 후 다시 시도해 주세요.');}
+    go.disabled=false;go.textContent='사용자키 신청';
+  });
+})();
+</script></body></html>
